@@ -4,23 +4,47 @@
   template: src=centos-proxies.conf dest=/etc/httpd/conf.d/
   when: ansible_os_family == "RedHat" 
 
-- name: Copy proxy config to sites-available (Debian)
-  template: src=images.conf dest=/etc/apache2/sites-available/ owner=root group=root
-  when: ansible_os_family == "Debian" 
+# - name: Copy proxy config to sites-available (Debian)
+#   template: src=images.conf dest=/etc/apache2/sites-available/ owner=root group=root
+#   when: ansible_os_family == "Debian"
 
-- name: Remove the default apache site enabled (Debian)
-  command: "find /etc/apache2/sites-enabled/ -type l -delete" 
-  ignore_errors: yes
-  when: ansible_os_family == "Debian" 
+- name: Ensure virtual host exists to sites-available (Debian)
+  apache_vhost: name={{ images_hostname }}
+  when: ansible_os_family == "Debian"
+  notify:
+    - reload apache
+
+- name: Ensure proxypass exists in virtual host
+  apache_proxypass: name="{{ images_hostname }}" src="{{ item.src }}" dest="{{ item.dest }}"
+  with_items:
+    - { src: /data, dest: "!" }
+    - { src: "{{ images_context_path }}", dest: "http://localhost:8080{{ images_context_path }}" }
+  when: ansible_os_family == "Debian"
+  notify:
+    - reload apache
+
+#- name: Remove the default apache site enabled (Debian)
+#  command: "find /etc/apache2/sites-enabled/ -type l -delete" 
+#  ignore_errors: yes
+#  when: ansible_os_family == "Debian" 
 
 - name: Create symlink to sites-enabled (Debian)
-  command: "ln -s /etc/apache2/sites-available/images.conf /etc/apache2/sites-enabled/images" 
+  command: "a2ensite {{ images_hostname }}" 
+  args:
+    creates: /etc/apache2/sites-enabled/{{ images_hostname }}
   ignore_errors: yes
   when: ansible_os_family == "Debian" 
+  notify:
+    - reload apache
+
+- name: Ensure www data directory exists
+  file: name=/srv/{{ images_hostname }}/www/data state=directory
 
 - name: Create symlink to images store (Debian)
-  command: "ln -sf /data /var/www/data" 
-  ignore_errors: yes
+  file: dest=/srv/{{ images_hostname }}/www/data/{{item}} src={{data_dir}}/{{item}} state=link
+  with_items:
+    - images
+    - ala-images
   when: ansible_os_family == "Debian" 
 
 - name: Start Apache2

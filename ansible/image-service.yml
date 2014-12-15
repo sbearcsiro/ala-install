@@ -1,9 +1,6 @@
 - hosts: image-service
   roles:
-    - java
     - common
-    - postgresql
-    - tomcat
-    - apache
-    - image-service
+    - { role: postgresql_instance, db_name: '{{images_db_name}}',  db_username: '{{images_db_username}}', db_password: '{{images_db_password}}' }
+    - { role: image-service, db_name: '{{images_db_name}}',  db_username: '{{images_db_username}}', db_password: '{{images_db_password}}' }
     - images-apache

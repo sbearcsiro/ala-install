@@ -9,5 +9,4 @@
 - name: create  DB user
   mysql_user: name={{ db_username }} password={{ db_password }} priv={{ db_name }}.*:ALL state=present
   tags:
-    - webapi
     - mysql

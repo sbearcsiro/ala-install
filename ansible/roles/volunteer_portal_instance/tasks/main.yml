@@ -2,16 +2,16 @@
   tags:
     - volunteer-portal
 
-- name: ensure target directories exist [data subdirectories etc.]
-  file: path={{item}} state=directory owner={{tomcat_user}} group={{tomcat_user}}
-  with_items:
-    - "{{data_dir}}/volunteer-portal/config"
-  tags:
-    - volunteer-portal
+- set_fact: war_filename="ROOT"
+  when: volunteer_context_path == "/"
+
+- set_fact: war_filename="{{volunteer_context_path}}"
+  when: volunteer_context_path != "/"
 
 - name: ensure target directories exist [data subdirectories etc.]
   file: path={{item}} state=directory owner={{tomcat_user}}  group={{tomcat_user}}
   with_items:
+    - "{{data_dir}}/volunteer-portal/config"
     - "{{data_dir}}/volunteer-portal/project"
     - "{{data_dir}}/volunteer-portal/projectStaging"
     - "{{data_dir}}/volunteer-portal/projectType"
@@ -28,27 +28,47 @@
   tags:
     - volunteer-portal
 
-- name: Copy proxy config to conf.d (Redhat)
-  template: src=volunteer-portal.j2 dest=/etc/httpd/conf.d/default-vhost.conf
-  when: ansible_os_family == "RedHat" 
-  tags:
-    - volunteer-portal
+#- name: Copy proxy config to conf.d (Redhat)
+#  template: src=volunteer-portal.j2 dest=/etc/httpd/conf.d/default-vhost.conf
+#  when: ansible_os_family == "RedHat" 
+#  tags:
+#    - volunteer-portal
 
-- name: Create Volunteer Portal virtual host config file (Debian)
-  template: src=volunteer-portal.j2 dest=/etc/apache2/sites-available/volunteer-portal owner=root group=root
-  when: ansible_os_family == "Debian" 
-  tags:
-    - volunteer-portal
+#- name: Create Volunteer Portal virtual host config file (Debian)
+#  template: src=volunteer-portal.j2 dest=/etc/apache2/sites-available/volunteer-portal owner=root group=root
+#  when: ansible_os_family == "Debian" 
+#  tags:
+#    - volunteer-portal
 
-- name: Disable all existing virtual hosts (TODO don't do this) (Debian)
-  command: "a2dissite *" 
+- name: Ensure apache vhost exists
+  apache_vhost: name={{ vp_hostname }}
   ignore_errors: yes
-  when: ansible_os_family == "Debian" 
+  notify:
+    - reload apache
   tags:
     - volunteer-portal
+
+- name: Ensure proxy pass exists for apache
+  apache_proxypass: name={{ vp_hostname }} src={{ item.src }} dest={{ item.dest }}
+  with_items:
+    - { src: /data, dest: "!" }
+    - { src: "{{ volunteer_context_path }}", dest: "http://localhost:8080{{ volunteer_context_path }}" }
+  notify:
+    - reload apache
+  tags:
+    - volunteer-portal
+
+#- name: Disable all existing virtual hosts (TODO don't do this) (Debian)
+#  command: "a2dissite *" 
+#  ignore_errors: yes
+#  when: ansible_os_family == "Debian" 
+#  tags:
+#    - volunteer-portal
 
 - name: Enable VP virtual host (Debian)
-  command: "a2ensite volunteer-portal" 
+  command: a2ensite {{ vp_hostname }}
+  args:
+    creates: /etc/apache2/sites-enabled/{{ vp_hostname }}
   ignore_errors: yes
   when: ansible_os_family == "Debian" 
   notify:
@@ -59,18 +79,33 @@
 - name: Ensure volunteers WWW directory exists
   file: path={{ item }} state=directory
   with_items:
-    - /srv/volunteer/www
-    - /srv/volunteer/www/data
-  tags:
+    - /srv/{{ vp_hostname }}/www
+    - /srv/{{ vp_hostname }}/www/data
     - volunteer-portal
 
 - name: Symlink data dir to /data
-  file: dest=/srv/volunteer/www/data/volunteer src={{data_dir}}/volunteer-portal state=link
+  file: dest=/srv/{{ vp_hostname }}/www/data/volunteer src={{data_dir}}/volunteer-portal state=link
   tags:
     - volunteer-portal
 
+- name: ensure tomcat vhost webapps directory exists
+  file: path="{{tomcat_dir}}/webapps-{{ vp_hostname }}" state=directory owner={{tomcat_user}} group={{tomcat_user}}
+  notify:
+    - restart tomcat
+  tags:
+    - volunteer-portal
+    - config
+
+- name: create tomcat vhost
+  tomcat_vhost: name={{ vp_hostname }}
+  notify:
+    - restart tomcat
+  tags:
+    - volunteer-portal
+    - tomcat
+
 - name: download from maven repo
-  get_url: url={{ volunteers_url }} dest="{{tomcat_webapps}}ROOT.war"
+  get_url: url={{ volunteers_url }} dest="{{ tomcat_dir }}/webapps-{{ vp_hostname }}/{{ war_filename }}.war"
   notify:
     - restart tomcat
   register: getwar
@@ -78,6 +113,6 @@
     - volunteer-portal
 
 - name: delete existing webapp
-  file: path="{{ tomcat_webapps }}ROOT" state=absent
+  file: path="{{ tomcat_dir }}/webapps-{{ vp_hostname }}/{{ war_filename }}" state=absent
   when: getwar.changed
 

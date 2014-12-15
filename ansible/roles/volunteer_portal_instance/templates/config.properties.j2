@@ -1,8 +1,8 @@
 # CAS Config
 casProperties=casServerLoginUrl,serverName,centralServer,casServerName,uriFilterPattern,uriExclusionFilter,authenticateOnlyIfLoggedInFilterPattern,casServerLoginUrlPrefix,gateway,casServerUrlPrefix,contextPath
-serverName=http://{{ hostname }}
-server.url=http://{{ hostname }}/
-grails.serverURL=http://{{ hostname }}/
+serverName=http://{{ vp_hostname }}
+server.url=http://{{ vp_hostname }}{{volunteer_context_path}}
+grails.serverURL=http://{{ hostname }}{{volunteer_context_path}}
 contextPath={{volunteer_context_path}}
 casServerName=https://auth.ala.org.au
 uriExclusionFilterPattern=/images.*,/css.*,/js.*,/less.*

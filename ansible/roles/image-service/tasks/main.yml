@@ -1,5 +1,11 @@
 - include: ../../common/tasks/setfacts.yml
 
+- set_fact: war_filename="ROOT"
+  when: images_context_path == "/"
+
+- set_fact: war_filename="{{images_context_path}}"
+  when: images_context_path != "/"
+
 - name: create images database
   postgresql_db: name=images
   sudo_user: postgres
@@ -12,8 +18,29 @@
   sudo_user: postgres
   sudo: True
 
+- name: ensure tomcat vhost webapps directory exists
+  file: path="{{tomcat_dir}}/webapps-{{ images_hostname }}" state=directory owner={{tomcat_user}} group={{tomcat_user}}
+  notify:
+    - restart tomcat
+  tags:
+    - image-service
+    - config
+
 - name: download from maven repo
-  command: "wget {{images_url}} --output-document={{tomcat_webapps}}images.war"
+  get_url: url={{ images_url }} dest="{{ tomcat_dir }}/webapps-{{ images_hostname }}/{{war_filename}}.war"
+  notify:
+    - restart tomcat
+  tags:
+    - image-service
+    - tomcat
+
+- name: create tomcat vhost
+  tomcat_vhost: name={{ images_hostname }}
+  notify:
+    - restart tomcat
+  tags:
+    - image-service
+    - tomcat
 
 - name: ensure target directories exist [data subdirectories etc.]
   file: path={{item}} state=directory owner={{tomcat_user}} group={{tomcat_user}}
@@ -21,7 +48,7 @@
     - "{{data_dir}}/images/config"
 
 - name: ensure target directories exist [data subdirectories etc.]
-  file: path={{item}} state=directory owner={{tomcat_user}}  group={{tomcat_user}} 
+  file: path={{item}} state=directory owner={{tomcat_user}}  group={{tomcat_user}}
   with_items:
     - "{{data_dir}}/images/config"  
     - "{{data_dir}}/images/store"
@@ -32,7 +59,7 @@
   template: src=config/config.properties dest={{data_dir}}/images/config/images-config.properties
 
 - name: set data ownership
-  file: path={{data_dir}}/{{images_app}} owner={{tomcat_user}} group={{tomcat_user}} recurse=true
+  file: path={{data_dir}}/{{images_app}} state=directory owner={{tomcat_user}} group={{tomcat_user}} recurse=true
   notify: 
     - restart tomcat
 

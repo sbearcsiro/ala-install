@@ -34,11 +34,11 @@
 
 	ProxyPass        /data !
 {% if tomcat_ajp == true %}
-	ProxyPass        /     ajp://127.0.0.1:{{tomcat_ajp_port}}/
-	ProxyPassReverse /     ajp://127.0.0.1:{{tomcat_ajp_port}}/
+	ProxyPass        {{volunteer_context_path}}     ajp://127.0.0.1:{{tomcat_ajp_port}}{{volunteer_context_path}}
+	ProxyPassReverse {{volunteer_context_path}}     http://127.0.0.1:{{tomcat_ajp_port}}{{volunteer_context_path}}
 {% else %}
-	ProxyPass        /  http://127.0.0.1:{{tomcat_http_port}}/
-	ProxyPassReverse /  http://127.0.0.1:{{tomcat_http_port}}/
+	ProxyPass        {{volunteer_context_path}}     http://127.0.0.1:{{tomcat_http_port}}{{volunteer_context_path}}
+	ProxyPassReverse {{volunteer_context_path}}     http://127.0.0.1:{{tomcat_http_port}}{{volunteer_context_path}}
 {% endif %}
 
 

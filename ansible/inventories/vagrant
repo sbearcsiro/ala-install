@@ -106,8 +106,12 @@ sampling_service_url = http://10.1.1.2/sampling-service
 sampling_service_base_url = http://10.1.1.2
 sampling_service_context_path = /sampling-service
 
+[image-service:vars]
+hostname = images-dev.ala.org.au
+images_db_password=password
+
 [volunteer-portal:vars]
-hostname = 10.1.1.2
+hostname = vp-dev.ala.org.au
 volunteers_db_password=password
 
 [webapi_standalone:vars]
